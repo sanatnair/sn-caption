@@ -174,28 +174,31 @@ def dvc(args):
         if results is None:
             continue
 
-        logging.info("Best Performance at end of training in dense video captioning")
-        logging.info(f'| Bleu_1_tight: {results["Bleu_1_tight"]}')
-        logging.info(f'| Bleu_2_tight: {results["Bleu_2_tight"]}')
-        logging.info(f'| Bleu_3_tight: {results["Bleu_3_tight"]}')
-        logging.info(f'| Bleu_4_tight: {results["Bleu_4_tight"]}')
-        logging.info(f'| METEOR_tight: {results["METEOR_tight"]}')
-        logging.info(f'| ROUGE_L_tight: {results["ROUGE_L_tight"]}')
-        logging.info(f'| CIDEr_tight: {results["CIDEr_tight"]}')
-        logging.info(f'| Recall_tight: {results["Recall_tight"]}')
-        logging.info(f'| Precision_tight: {results["Precision_tight"]}')
+        if results:
+            logging.info("Best Performance at end of training in dense video captioning")
+            logging.info(f'| Bleu_1_tight: {results["Bleu_1_tight"]}')
+            logging.info(f'| Bleu_2_tight: {results["Bleu_2_tight"]}')
+            logging.info(f'| Bleu_3_tight: {results["Bleu_3_tight"]}')
+            logging.info(f'| Bleu_4_tight: {results["Bleu_4_tight"]}')
+            logging.info(f'| METEOR_tight: {results["METEOR_tight"]}')
+            logging.info(f'| ROUGE_L_tight: {results["ROUGE_L_tight"]}')
+            logging.info(f'| CIDEr_tight: {results["CIDEr_tight"]}')
+            logging.info(f'| Recall_tight: {results["Recall_tight"]}')
+            logging.info(f'| Precision_tight: {results["Precision_tight"]}')
 
-        logging.info(f'| Bleu_1_loose: {results["Bleu_1_loose"]}')
-        logging.info(f'| Bleu_2_loose: {results["Bleu_2_loose"]}')
-        logging.info(f'| Bleu_3_loose: {results["Bleu_3_loose"]}')
-        logging.info(f'| Bleu_4_loose: {results["Bleu_4_loose"]}')
-        logging.info(f'| METEOR_loose: {results["METEOR_loose"]}')
-        logging.info(f'| ROUGE_L_loose: {results["ROUGE_L_loose"]}')
-        logging.info(f'| CIDEr_loose: {results["CIDEr_loose"]}')
-        logging.info(f'| Recall_loose: {results["Recall_loose"]}')
-        logging.info(f'| Precision_loose: {results["Precision_loose"]}')
+            logging.info(f'| Bleu_1_loose: {results["Bleu_1_loose"]}')
+            logging.info(f'| Bleu_2_loose: {results["Bleu_2_loose"]}')
+            logging.info(f'| Bleu_3_loose: {results["Bleu_3_loose"]}')
+            logging.info(f'| Bleu_4_loose: {results["Bleu_4_loose"]}')
+            logging.info(f'| METEOR_loose: {results["METEOR_loose"]}')
+            logging.info(f'| ROUGE_L_loose: {results["ROUGE_L_loose"]}')
+            logging.info(f'| CIDEr_loose: {results["CIDEr_loose"]}')
+            logging.info(f'| Recall_loose: {results["Recall_loose"]}')
+            logging.info(f'| Precision_loose: {results["Precision_loose"]}')
 
-        wandb.log({f"{k}_{split}_pt" : v for k, v in results.items()})
+            wandb.log({f"{k}_{split}_pt" : v for k, v in results.items()})
+        else:
+            logging.warning("No dense captioning metrics available; skipping logging.")
 
 
 if __name__ == '__main__':
