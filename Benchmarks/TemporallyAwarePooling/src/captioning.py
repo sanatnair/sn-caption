@@ -24,13 +24,24 @@ def main(args):
 
     # create dataset
     if not args.test_only:
-        dataset_Train = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_train, version=args.version, framerate=args.framerate, window_size=args.window_size_caption)
-        dataset_Valid = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_valid, version=args.version, framerate=args.framerate, window_size=args.window_size_caption)
-        dataset_Valid_metric  = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_valid, version=args.version, framerate=args.framerate, window_size=args.window_size_caption)
-    dataset_Test  = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_test, version=args.version, framerate=args.framerate, window_size=args.window_size_caption)
+        dataset_Train = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_train, version=args.version, framerate=args.framerate, window_size=args.window_size_caption, no_download=args.no_download)
+        dataset_Valid = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_valid, version=args.version, framerate=args.framerate, window_size=args.window_size_caption, no_download=args.no_download)
+        dataset_Valid_metric  = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_valid, version=args.version, framerate=args.framerate, window_size=args.window_size_caption, no_download=args.no_download)
+    dataset_Test  = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_test, version=args.version, framerate=args.framerate, window_size=args.window_size_caption, no_download=args.no_download)
+
+    if len(dataset_Test) == 0:
+        if not args.test_only and len(dataset_Train) > 0:
+            logging.warning("Test split has 0 samples after filtering; using train split to infer feature_dim.")
+        else:
+            raise RuntimeError(
+                "Test split has 0 samples after filtering. Check missing files list or adjust --split_test/--features."
+            )
 
     if args.feature_dim is None:
-        args.feature_dim = dataset_Test[0][0].shape[-1]
+        if len(dataset_Test) > 0:
+            args.feature_dim = dataset_Test[0][0].shape[-1]
+        else:
+            args.feature_dim = dataset_Train[0][0].shape[-1]
         print("feature_dim found:", args.feature_dim)
     # create model
     model = Video2Caption(vocab_size=dataset_Test.vocab_size, weights=args.load_weights, input_size=args.feature_dim,
@@ -92,6 +103,7 @@ def main(args):
             version=args.version,
             framerate=args.framerate,
             window_size=args.window_size_caption,
+            no_download=args.no_download,
             )
 
         test_loader = torch.utils.data.DataLoader(dataset_Test,
@@ -122,7 +134,7 @@ def dvc(args):
     for arg in vars(args):
         logging.info(arg.rjust(15) + " : " + str(getattr(args, arg)))
 
-    dataset_Test  = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_test, version=args.version, framerate=args.framerate, window_size=args.window_size_caption)
+    dataset_Test  = SoccerNetCaptions(path=args.SoccerNet_path, features=args.features, split=args.split_test, version=args.version, framerate=args.framerate, window_size=args.window_size_caption, no_download=args.no_download)
 
     if args.feature_dim is None:
         args.feature_dim = dataset_Test[0][0].shape[-1]
@@ -149,7 +161,7 @@ def dvc(args):
     # generate dense caption on multiple splits [test/challenge]
     for split in args.split_test:
         PredictionPath = os.path.join("models", args.model_name, f"outputs/{split}")
-        dataset_Test  = PredictionCaptions(SoccerNetPath=args.SoccerNet_path, PredictionPath=PredictionPath, features=args.features, split=[split], version=args.version, framerate=args.framerate, window_size=args.window_size_caption)
+        dataset_Test  = PredictionCaptions(SoccerNetPath=args.SoccerNet_path, PredictionPath=PredictionPath, features=args.features, split=[split], version=args.version, framerate=args.framerate, window_size=args.window_size_caption, no_download=args.no_download)
 
         test_loader = torch.utils.data.DataLoader(dataset_Test,
             batch_size=args.batch_size, shuffle=False,
@@ -225,8 +237,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed',   required=False, type=int,   default=0, help='seed for reproducibility')
 
     parser.add_argument('--loglevel',   required=False, type=str,   default='INFO', help='logging level')
+    parser.add_argument('--no_download', action='store_true', help='Do not auto-download SoccerNet files')
 
     args = parser.parse_args()
+    args.no_download = getattr(args, "no_download", False)
 
     # for reproducibility
     torch.manual_seed(args.seed)

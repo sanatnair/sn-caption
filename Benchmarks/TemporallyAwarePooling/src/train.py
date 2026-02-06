@@ -18,7 +18,8 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 import wandb
 
-caption_scorer = NLGEval(no_glove=True, no_skipthoughts=True)
+#caption_scorer = NLGEval(no_glove=True, no_skipthoughts=True)
+caption_scorer = None
 
 def trainer(phase, train_loader,
             val_loader,

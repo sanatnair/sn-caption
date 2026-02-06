@@ -1,0 +1,25 @@
+# Datasets
+caption-2024/
+
+# Weights / checkpoints / outputs
+models/
+**/*.pth
+**/*.pt
+**/*.pth.tar
+**/*.ckpt
+
+# Keep specific pretrained weights
+!models/baidu-NetVlad-pretrain-caption/
+!models/baidu-NetVlad-pretrain-caption/**
+
+# W&B
+wandb/
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# Python cache
+__pycache__/
+*.pyc

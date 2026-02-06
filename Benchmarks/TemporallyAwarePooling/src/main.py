@@ -59,8 +59,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed',   required=False, type=int,   default=0, help='seed for reproducibility')
 
     parser.add_argument('--loglevel',   required=False, type=str,   default='INFO', help='logging level')
+    parser.add_argument('--no_download', action='store_true', help='Do not auto-download SoccerNet files')
 
     args = parser.parse_args()
+    args.no_download = getattr(args, "no_download", False)
 
     # for reproducibility
     torch.manual_seed(args.seed)

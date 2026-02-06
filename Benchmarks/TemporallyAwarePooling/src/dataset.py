@@ -19,12 +19,41 @@ from torchtext.vocab import vocab
 from SoccerNet.Downloader import getListGames
 from SoccerNet.Downloader import SoccerNetDownloader
 from SoccerNet.Evaluation.utils import getMetaDataTask
-from torch.utils.data import default_collate
+from torch.utils.data._utils.collate import default_collate
 import numpy as np
 
 PAD_TOKEN = 0
 SOS_TOKEN = 1
 EOS_TOKEN = 2
+
+def _filter_games_with_features(path, games, features, require_labels=False, labels_filename=None, log_limit=5, dump_filename=None):
+    valid_games = []
+    missing = []
+    for game in games:
+        f1 = os.path.join(path, game, "1_" + features)
+        f2 = os.path.join(path, game, "2_" + features)
+        if not (os.path.exists(f1) and os.path.exists(f2)):
+            missing.append(game)
+            continue
+        if require_labels and labels_filename is not None:
+            labels_path = os.path.join(path, game, labels_filename)
+            if not os.path.exists(labels_path):
+                missing.append(game)
+                continue
+        valid_games.append(game)
+    if missing:
+        sample = missing[:log_limit]
+        logging.warning("Missing sample (%d of %d): %s", len(sample), len(missing), "; ".join(sample))
+        if dump_filename:
+            try:
+                dump_path = os.path.join(path, dump_filename)
+                with open(dump_path, "w", encoding="utf-8") as f:
+                    for game in missing:
+                        f.write(game + "\n")
+                logging.warning("Wrote full missing list to %s", dump_path)
+            except Exception as exc:
+                logging.warning("Failed to write missing list: %s", exc)
+    return valid_games, missing
 
 def collate_fn_padd(batch):
     '''
@@ -72,7 +101,7 @@ class SoccerNetClips(Dataset):
     This class is used to download and pre-compute clips from the SoccerNet dataset for spotting training phase.
     """
     def __init__(self, path, features="ResNET_PCA512.npy", split=["train"], version=2, 
-                framerate=2, window_size=15):
+                framerate=2, window_size=15, no_download=False):
         self.path = path
         self.listGames = getListGames(split, task="caption")
         self.features = features
@@ -83,13 +112,22 @@ class SoccerNetClips(Dataset):
         self.num_classes = num_classes
         self.dict_event = dict_event
 
-        logging.info("Checking/Download features and labels locally")
-        downloader = SoccerNetDownloader(path)
-        for s in split:
-            if s == "challenge":
-                downloader.downloadGames(files=[f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
-            else:
-                downloader.downloadGames(files=[self.labels, f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
+        if not no_download:
+            logging.info("Checking/Download features and labels locally")
+            downloader = SoccerNetDownloader(path)
+            for s in split:
+                if s == "challenge":
+                    downloader.downloadGames(files=[f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
+                else:
+                    downloader.downloadGames(files=[self.labels, f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
+        else:
+            logging.info("Skipping auto-download (no_download=True)")
+            self.listGames, missing = _filter_games_with_features(
+                self.path, self.listGames, self.features, require_labels=True, labels_filename=self.labels,
+                dump_filename="_missing_games_features_or_labels.txt"
+            )
+            if missing:
+                logging.warning("Skipping %d games with missing features/labels", len(missing))
 
         logging.info("Pre-compute clips")
 
@@ -174,7 +212,7 @@ class SoccerNetClipsTesting(Dataset):
     This class is used to download and pre-compute clips from the SoccerNet dataset for spotting inference phase.
     """
     def __init__(self, path, features="ResNET_PCA512.npy", split=["test"], version=2, 
-                framerate=2, window_size=15):
+                framerate=2, window_size=15, no_download=False):
         self.path = path
         self.listGames = getListGames(split, task="caption")
         self.features = features
@@ -187,13 +225,22 @@ class SoccerNetClipsTesting(Dataset):
         self.num_classes = num_classes
         self.dict_event = dict_event
 
-        logging.info("Checking/Download features and labels locally")
-        downloader = SoccerNetDownloader(path)
-        for s in split:
-            if s == "challenge":
-                downloader.downloadGames(files=[f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
-            else:
-                downloader.downloadGames(files=[self.labels, f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
+        if not no_download:
+            logging.info("Checking/Download features and labels locally")
+            downloader = SoccerNetDownloader(path)
+            for s in split:
+                if s == "challenge":
+                    downloader.downloadGames(files=[f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
+                else:
+                    downloader.downloadGames(files=[self.labels, f"1_{self.features}", f"2_{self.features}"], split=[s], task="caption", verbose=False,randomized=True)
+        else:
+            logging.info("Skipping auto-download (no_download=True)")
+            self.listGames, missing = _filter_games_with_features(
+                self.path, self.listGames, self.features, require_labels=False, labels_filename=None,
+                dump_filename="_missing_games_features.txt"
+            )
+            if missing:
+                logging.warning("Skipping %d games with missing features", len(missing))
 
     def __getitem__(self, index):
         """
@@ -268,7 +315,7 @@ class SoccerNetCaptions(Dataset):
     """
     This class is used to download and pre-compute clips and captions from the SoccerNet dataset for captining training phase.
     """
-    def __init__(self, path, features="ResNET_TF2_PCA512.npy", split=["train"], version=2, framerate=2, window_size=15):
+    def __init__(self, path, features="ResNET_TF2_PCA512.npy", split=["train"], version=2, framerate=2, window_size=15, no_download=False):
         self.path = path
         split = [s for s in split if s!= "challenge"]
         self.listGames = getListGames(split, task="caption")
@@ -276,10 +323,20 @@ class SoccerNetCaptions(Dataset):
         self.window_size_frame = window_size*framerate
         self.version = version
         self.labels, self.num_classes, self.dict_event, _ = getMetaDataTask("caption", "SoccerNet", version)
+        self.no_download = no_download
 
-        logging.info("Checking/Download features and labels locally")
-        downloader = SoccerNetDownloader(path)
-        downloader.downloadGames(files=[self.labels, f"1_{self.features}", f"2_{self.features}"], task="caption",split=split, verbose=False,randomized=True)
+        if not no_download:
+            logging.info("Checking/Download features and labels locally")
+            downloader = SoccerNetDownloader(path)
+            downloader.downloadGames(files=[self.labels, f"1_{self.features}", f"2_{self.features}"], task="caption",split=split, verbose=False,randomized=True)
+        else:
+            logging.info("Skipping auto-download (no_download=True)")
+            self.listGames, missing = _filter_games_with_features(
+                self.path, self.listGames, self.features, require_labels=True, labels_filename=self.labels,
+                dump_filename="_missing_games_features_or_labels.txt"
+            )
+            if missing:
+                logging.warning("Skipping %d games with missing features/labels", len(missing))
 
         self.data = list()
         self.game_feats = list()
@@ -346,7 +403,32 @@ class SoccerNetCaptions(Dataset):
         Returns:
             corpus (List[string]): vocabulary build from split.
         """
-        corpus = [annotation['anonymized'] for game in getListGames(split, task="caption") for annotation in json.load(open(os.path.join(self.path, game, self.labels)))["annotations"]]
+        games = self.listGames if self.no_download else getListGames(split, task="caption")
+        corpus = []
+        missing = 0
+        missing_samples = []
+        missing_all = []
+        for game in games:
+            labels_path = os.path.join(self.path, game, self.labels)
+            if not os.path.exists(labels_path):
+                missing += 1
+                if len(missing_samples) < 5:
+                    missing_samples.append(game)
+                missing_all.append(game)
+                continue
+            labels = json.load(open(labels_path))
+            corpus.extend([annotation['anonymized'] for annotation in labels["annotations"]])
+        if missing:
+            logging.warning("Skipping %d games with missing labels in corpus build", missing)
+            logging.warning("Missing labels sample (%d of %d): %s", len(missing_samples), missing, "; ".join(missing_samples))
+            try:
+                dump_path = os.path.join(self.path, "_missing_labels_corpus.txt")
+                with open(dump_path, "w", encoding="utf-8") as f:
+                    for game in missing_all:
+                        f.write(game + "\n")
+                logging.warning("Wrote full missing labels list to %s", dump_path)
+            except Exception as exc:
+                logging.warning("Failed to write missing labels list: %s", exc)
         return corpus
     
     def detokenize(self, tokens, remove_EOS=True):
@@ -395,7 +477,19 @@ class SoccerNetTextProcessor(object):
     
     def build_vocab(self, corpus):
         counter = Counter([token for c in corpus for token in self.tokenizer(c)])
-        voc = vocab(counter, min_freq=self.min_freq, specials=["[PAD]", "[SOS]", "[EOS]", "[UNK]", "[MASK]", "[CLS]"])
+        specials = ["[PAD]", "[SOS]", "[EOS]", "[UNK]", "[MASK]", "[CLS]"]
+        try:
+            voc = vocab(counter, min_freq=self.min_freq, specials=specials)
+        except TypeError:
+            # Older torchtext versions don't support the 'specials' kwarg
+            voc = vocab(counter, min_freq=self.min_freq)
+            if hasattr(voc, "insert_token"):
+                for i, tok in enumerate(specials):
+                    voc.insert_token(tok, i)
+            elif hasattr(voc, "set_default_index"):
+                # Fallback: ensure UNK exists and default index is set
+                if "[UNK]" in specials and "[UNK]" not in voc.get_stoi():
+                    voc.insert_token("[UNK]", 0)
         voc.set_default_index(voc['[UNK]'])
         self.vocab = voc
     
@@ -406,7 +500,7 @@ class SoccerNetTextProcessor(object):
         return " ".join(self.vocab.lookup_tokens(tokens))
 
 class PredictionCaptions(Dataset):
-    def __init__(self, SoccerNetPath, PredictionPath, features="ResNET_TF2_PCA512.npy", split=["train"], version=2, framerate=2, window_size=15):
+    def __init__(self, SoccerNetPath, PredictionPath, features="ResNET_TF2_PCA512.npy", split=["train"], version=2, framerate=2, window_size=15, no_download=False):
         self.path = SoccerNetPath
         self.PredictionPath = PredictionPath
         self.listGames = getListGames(split, task="caption")
@@ -415,10 +509,20 @@ class PredictionCaptions(Dataset):
         self.version = version
         self.labels, _, self.dict_event, _ = getMetaDataTask("caption", "SoccerNet", version)
         self.split = split
+        self.no_download = no_download
 
-        logging.info("Checking/Download features and labels locally")
-        downloader = SoccerNetDownloader(self.path)
-        downloader.downloadGames(files=[f"1_{self.features}", f"2_{self.features}"], task="caption", split=split, verbose=False,randomized=True)
+        if not no_download:
+            logging.info("Checking/Download features and labels locally")
+            downloader = SoccerNetDownloader(self.path)
+            downloader.downloadGames(files=[f"1_{self.features}", f"2_{self.features}"], task="caption", split=split, verbose=False,randomized=True)
+        else:
+            logging.info("Skipping auto-download (no_download=True)")
+            self.listGames, missing = _filter_games_with_features(
+                self.path, self.listGames, self.features, require_labels=False, labels_filename=None,
+                dump_filename="_missing_games_features.txt"
+            )
+            if missing:
+                logging.warning("Skipping %d games with missing features", len(missing))
 
         self.data = list()
         self.game_feats = list()
@@ -494,7 +598,32 @@ class PredictionCaptions(Dataset):
         Returns:
             corpus (List[string]): vocabulary build from split.
         """
-        corpus = [annotation['anonymized'] for game in getListGames(split, task="caption") for annotation in json.load(open(os.path.join(self.path, game, self.labels)))["annotations"]]
+        games = self.listGames if self.no_download else getListGames(split, task="caption")
+        corpus = []
+        missing = 0
+        missing_samples = []
+        missing_all = []
+        for game in games:
+            labels_path = os.path.join(self.path, game, self.labels)
+            if not os.path.exists(labels_path):
+                missing += 1
+                if len(missing_samples) < 5:
+                    missing_samples.append(game)
+                missing_all.append(game)
+                continue
+            labels = json.load(open(labels_path))
+            corpus.extend([annotation['anonymized'] for annotation in labels["annotations"]])
+        if missing:
+            logging.warning("Skipping %d games with missing labels in corpus build", missing)
+            logging.warning("Missing labels sample (%d of %d): %s", len(missing_samples), missing, "; ".join(missing_samples))
+            try:
+                dump_path = os.path.join(self.path, "_missing_labels_corpus.txt")
+                with open(dump_path, "w", encoding="utf-8") as f:
+                    for game in missing_all:
+                        f.write(game + "\n")
+                logging.warning("Wrote full missing labels list to %s", dump_path)
+            except Exception as exc:
+                logging.warning("Failed to write missing labels list: %s", exc)
         return corpus
 
 
