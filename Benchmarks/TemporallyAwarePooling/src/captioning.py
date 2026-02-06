@@ -114,16 +114,19 @@ def main(args):
         if results is None:
             continue
 
-        logging.info("Best Performance at end of training in generating captions")
-        logging.info(f'| Bleu_1: {results["Bleu_1"]}')
-        logging.info(f'| Bleu_2: {results["Bleu_2"]}')
-        logging.info(f'| Bleu_3: {results["Bleu_3"]}')
-        logging.info(f'| Bleu_4: {results["Bleu_4"]}')
-        logging.info(f'| METEOR: {results["METEOR"]}')
-        logging.info(f'| ROUGE_L: {results["ROUGE_L"]}')
-        logging.info(f'| CIDEr: {results["CIDEr"]}')
+        if results:
+            logging.info("Best Performance at end of training in generating captions")
+            logging.info(f'| Bleu_1: {results["Bleu_1"]}')
+            logging.info(f'| Bleu_2: {results["Bleu_2"]}')
+            logging.info(f'| Bleu_3: {results["Bleu_3"]}')
+            logging.info(f'| Bleu_4: {results["Bleu_4"]}')
+            logging.info(f'| METEOR: {results["METEOR"]}')
+            logging.info(f'| ROUGE_L: {results["ROUGE_L"]}')
+            logging.info(f'| CIDEr: {results["CIDEr"]}')
 
-        wandb.log({f"{k}_{split}_gt" : v for k, v in results.items()})
+            wandb.log({f"{k}_{split}_gt" : v for k, v in results.items()})
+        else:
+            logging.warning("No caption metrics available; skipping logging.")
 
 
     return 
