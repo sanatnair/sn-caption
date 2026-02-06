@@ -26,12 +26,17 @@ def evaluate(SoccerNet_path, Predictions_path, prediction_file="results_spotting
 
     label_files, num_classes, _, _ = getMetaDataTask("caption", "SoccerNet", version)
 
+    missing = 0
     for game in tqdm(list_games):
 
         if zipfile.is_zipfile(SoccerNet_path):
             labels = LoadJsonFromZip(SoccerNet_path, os.path.join(game, label_files))
         else:
-            labels = json.load(open(os.path.join(SoccerNet_path, game, label_files)))
+            label_path = os.path.join(SoccerNet_path, game, label_files)
+            if not os.path.exists(label_path):
+                missing += 1
+                continue
+            labels = json.load(open(label_path))
         # convert labels to vector
         label_half_1, label_half_2 = label2vector(labels, num_classes=num_classes, version=version, framerate=framerate)
         # print(version)
@@ -113,6 +118,8 @@ def evaluate(SoccerNet_path, Predictions_path, prediction_file="results_spotting
         "a_mAP_unshown": a_mAP_unshown if version==2 else None,
         "a_mAP_per_class_unshown": a_mAP_per_class_unshown if version==2 else None,
     }
+    if missing:
+        print(f"Skipping {missing} games with missing labels in spotting evaluation")
     return results
 
 def label2vector(labels, num_classes=17, framerate=2, version=2):
