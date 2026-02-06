@@ -107,6 +107,9 @@ def evaluate(SoccerNet_path, Predictions_path, prediction_file="results_spotting
         deltas=np.arange(5)*1 + 1
     elif metric == "medium":
         deltas = np.array([30])
+    if len(targets_numpy) == 0:
+        print("No valid games for spotting evaluation; skipping metrics.")
+        return {}
     # Compute the performances
     a_mAP, a_mAP_per_class, a_mAP_visible, a_mAP_per_class_visible, a_mAP_unshown, a_mAP_per_class_unshown = average_mAP(targets_numpy, detections_numpy, closests_numpy, framerate, deltas=deltas)
     
