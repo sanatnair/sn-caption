@@ -409,6 +409,9 @@ def validate_captioning(dataloader, model, model_name):
             desc += f'(it:{data_time.val:.3f}s) '
             t.set_description(desc)
 
+    if caption_scorer is None:
+        logging.warning("caption_scorer is None; skipping caption metrics.")
+        return {}
     scores = caption_scorer.compute_metrics(ref_list=[all_labels,], hyp_list=all_outputs)
     return scores
 
