@@ -85,7 +85,7 @@ def main(args):
             num_workers=1, pin_memory=True)
 
         results = test_spotting(test_loader, model=model, model_name=args.model_name, NMS_window=args.NMS_window, NMS_threshold=args.NMS_threshold)
-        if results is None:
+        if not results:
             continue
 
         a_mAP_tight = results["a_mAP_tight"]
