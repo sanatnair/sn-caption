@@ -13,13 +13,23 @@ from SoccerNet.Evaluation.utils import AverageMeter, getMetaDataTask
 import glob
 from utils import evaluate as evaluate_spotting
 from SoccerNet.Evaluation.DenseVideoCaptioning import evaluate as evaluate_dvc
-from nlgeval import NLGEval
+try:
+    from nlgeval import NLGEval
+except Exception as exc:
+    NLGEval = None
+    logging.warning("NLGEval import failed: %s", exc)
 from torch.nn.utils.rnn import pack_padded_sequence
 
 import wandb
 
-#caption_scorer = NLGEval(no_glove=True, no_skipthoughts=True)
-caption_scorer = None
+if NLGEval is not None:
+    try:
+        caption_scorer = NLGEval(no_glove=True, no_skipthoughts=True)
+    except Exception as exc:
+        caption_scorer = None
+        logging.warning("NLGEval disabled: %s", exc)
+else:
+    caption_scorer = None
 
 def trainer(phase, train_loader,
             val_loader,
