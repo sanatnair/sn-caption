@@ -140,8 +140,15 @@ def train(phase, dataloader, model, criterion, optimizer, epoch, train=False):
             elif phase == "caption":
                 (feats, caption), lengths, mask, caption_or, cap_id = batch
                 caption = caption.cuda()
+                # Safety: clamp token ids to vocab range and lengths to valid bounds
+                max_id = getattr(model, "vocab_size", None)
+                if max_id is not None:
+                    max_id = max_id - 1
+                    caption = caption.clamp(min=0, max=max_id)
                 target = caption[:, 1:] #remove SOS token
                 lengths = lengths - 1
+                max_len = caption.size(1) - 1
+                lengths = torch.clamp(lengths, min=1, max=max_len)
                 #pack_padded_sequence to do less computation
                 target = pack_padded_sequence(target, lengths, batch_first=True, enforce_sorted=False)[0]
                 mask = pack_padded_sequence(mask[:, 1:], lengths, batch_first=True, enforce_sorted=False)[0]
