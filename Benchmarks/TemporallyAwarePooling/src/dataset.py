@@ -392,7 +392,10 @@ class SoccerNetCaptions(Dataset):
         """
         clip_id, (caption_id, caption) = self.data[idx]
         vfeats = self.video_processor(clip_id, self.game_feats)
-        caption_tokens = self.text_processor(caption)    
+        caption_tokens = self.text_processor(caption)
+        # Safety: clamp tokens to vocab range to avoid embedding crashes
+        max_id = self.vocab_size - 1
+        caption_tokens = [t if 0 <= t <= max_id else self.text_processor.vocab['[UNK]'] for t in caption_tokens]
         
         return vfeats, caption_tokens, clip_id[0], caption_id, caption
     
