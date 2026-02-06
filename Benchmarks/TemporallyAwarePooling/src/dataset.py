@@ -494,7 +494,11 @@ class SoccerNetTextProcessor(object):
         self.vocab = voc
     
     def __call__(self, text):
-        return self.vocab(self.tokenizer(text))
+        ids = self.vocab(self.tokenizer(text))
+        # Safety: clamp any out-of-range ids to UNK to avoid embedding crashes
+        max_id = len(self.vocab) - 1
+        unk = self.vocab['[UNK]']
+        return [i if 0 <= i <= max_id else unk for i in ids]
     
     def detokenize(self, tokens):
         return " ".join(self.vocab.lookup_tokens(tokens))
